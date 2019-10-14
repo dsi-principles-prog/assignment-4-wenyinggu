@@ -6,19 +6,64 @@ output: html_notebook
 
 For the regular expression exercises, try writing first using regular expressions directly, then try using rverbalexpressions. Provide the code for both. 
 
+# Libraries introduced for this assignment
+```{r}
+library(tidyverse)
+library(lubridate)
+library(stringr)
+library(RVerbalExpressions)
+```
+
 # Part 1
 
 ## R4DS 16.4.5
 
 Create a vector of dates giving the first day of every month in the current year. 
+```{r}
+first_date_of_month<- ymd(20190101)+months(0:11)
+first_date_of_month
+```
+We get a 1*12 vector which contains 12 month's first day. 
 
 Write a function that given your birthday (as a date), returns how old you are in years.
+```{r}
+age <- function(birthday) {
+ (birthday %--% today()) %/% years(1)
+}
+birthday <- ymd(19920220)
+age(birthday)
+```
+I am 27 years old. 
 
 Write a function that given your birthday, returns the day of the week you were born on. 
+```{r}
+my_birthday <- ymd(19920220)
+wday(my_birthday,label = TRUE)
+```
+My birthday is on Thursday.
 
 ## R4DS 14.3.2.1
 
 Given the corpus of common words in stringr::words, create regular expressions that find all words that have seven letters or more. (Since this list is long, you might want to use the match argument to str_view() to show only the matching or non-matching words.)
+
+# Load the stringr data here and write two ways to find list of >=7 letters.
+```{r}
+words<-stringr::words
+str_view(words,".......+", match = TRUE)
+str_view(words,"\\w{7,}", match = TRUE)
+
+
+seven_or_more <- rx() %>%
+  rx_start_of_line() %>%
+  rx_word_char() %>%
+  rx_repeat_previous(7) %>%
+  rx_anything()%>%
+  rx_end_of_line()
+
+str_view(words,seven_or_more, match = TRUE)
+
+```
+Load the stringr data here and write two ways to find list of >=7 letters.
 
 ## R4DS 14.3.3.1
 
@@ -30,22 +75,314 @@ Empirically verify the rule “i before e except after c”.
 
 Create a regular expression that will match telephone numbers as commonly written in the US. Split this up into multiple expressions as needed.
 
+# That only contain consonants. (Hint: thinking about matching “not”-vowels.)
+```{r}
+words[str_detect(words,"^[^aeiou]+$")]
+#add ^in a [] means I don't need the staff in the []
+#set^ and $ to limit the range
+consonants <- rx() %>%
+  rx_start_of_line() %>%
+  rx_something_but("aeiou") %>%
+  rx_end_of_line()
+words[str_detect(words,consonants)]
+```
+In the list of words, there are five consonants. They are by, dry, fly, mrs and try.  
+
+# Empirically verify the rule “i before e except after c”.
+```{r}
+words[str_detect(words, "cie")]
+cie <- rx() %>%
+  rx_find("cie")
+words[str_detect(words,cie)]
+```
+In the list of words, there are 2 words contradict the rule “i before e except after c”. They are science, society.
+
+# Create a regular expression that will match telephone numbers as commonly written in the US. Split this up into multiple expressions as needed.
+
+```{r}
+list<- c("(217)-377-2867", "217.377.2867", "217-377-2867", "EM7.377.2867") 
+str_detect(list, "\\d{3}(\\))?[-\\.]\\d{3}[-\\.]\\d{4}$")
+
+telrx <- rx() %>%
+  rx_start_of_line() %>%
+  rx_maybe("(")
+  rx_digit() %>%
+  rx_repeat_previous(3) %>%
+  rx_maybe(")") %>%
+  rx_any_of("-.")%>%
+  rx_digit() %>%
+  rx_repeat_previous(3) %>%
+  rx_any_of("-.")%>%
+  rx_digit()%>%
+  rx_repeat_previous(4) %>%
+  rx_end_of_line()%>%
+  print()%>%
+  grepl(c("(217)-377-2867", "217.377.2867", "217-377-2867", "EM7.377.2867"))%>%
+  print()
+```
+
+
+# 8/10 Libraries at top \  ???? why 
+# 2/10 Header and description, code chunks named \  code chunks named ??????????? 1. Describe the data and the problem
+10/10 Import code in nb \
+# 0/4 with clean_names() (Extra credit) \
+10/10 with assert statement(s) \
+10/10 cleaning code (type conversion, NA recoding, other) \
+6/6 with description of rationale \
+# 2/4 with tidyverse/dplyr code \
+
 # Part 2
-
-
 Choose a dataset (this can be the same dataset as the last assignment, or a new one). Define a predictive modeling problem. Create the appropriate files and notebooks to do the following:
 
+# I want to replace my assign3 score use assign4 answers
 1. Describe the data and the problem
+This dataset describes the listing activity and metrics in NYC, NY for 2019. I will try to predict the airbnb price in NYC region. The following list presents 16 variables in this datasets
+  ..   id 
+  ..   name 
+  ..   host_id 
+  ..   host_name 
+  ..   neighbourhood_group 
+  ..   neighbourhood 
+  ..   latitude 
+  ..   longitude 
+  ..   room_type 
+  ..   price 
+  ..   minimum_nights 
+  ..   number_of_reviews
+  ..   last_review 
+  ..   reviews_per_month 
+  ..   calculated_host_listings_count 
+  ..   availability_365
+# Installed Libraries
+```{r library}
+library(readr)
+library(tidyverse)
+library(dplyr)
+library(assertr)
+library(janitor)
+library(stringr)
+library(glue)
+```
+
+# Load Data 
+
+```{r load data}
+AB_NYC_2019 <- read_csv("AB_NYC_2019.csv")
+View(AB_NYC_2019)
+```
+
 
 2. Read in and check data
+# I use the function head() and str() to read the data and have a general idea about the datasets.There is no violation in colomn "id"; "host_id"; "neighbourhood_group"; "neighbourhood"; "latitude"; "longitude"; "room_type"; "price"; “minimum_nights”; “number_of_reviews”; “calculated_host_listings_count”; “availability_365” which means all the numbers are not na. There 16 na numbers in “name" column; 21 na numbers in "host_name" column; 10052 na numbers in "last_review" column and "reviews_per_month" column. I check the bounds of some columns and I find there are 14 unusual data in "minium_night" column. They've been renting on airbnb for more than a year.
 
-2. Clean up the data. 
+# Read and Check Data
 
-*Note: You may request that score for these sections replace your score for the coding portion of Assignment 3.*
+```{r read data}
+head(AB_NYC_2019)
+str(AB_NYC_2019)
+```
+
+
+```{r check data na 1}
+AB_NYC_2019 %>%
+  verify(!is.na(AB_NYC_2019[1]))
+```
+
+```{r check data na 2}
+AB_NYC_2019 %>%
+  verify(!is.na(AB_NYC_2019[2]))
+```
+
+```{r check data na 3}
+AB_NYC_2019 %>%
+  verify(!is.na(AB_NYC_2019[3]))
+```
+
+```{r check data na 4}
+AB_NYC_2019 %>%
+  verify(!is.na(AB_NYC_2019[4]))
+```
+
+```{r check data na 5}
+AB_NYC_2019 %>%
+  verify(!is.na(AB_NYC_2019[5]))
+```
+
+```{r check data na 6}
+AB_NYC_2019 %>%
+  verify(!is.na(AB_NYC_2019[6]))
+```
+
+```{r check data na 7}
+AB_NYC_2019 %>%
+  verify(!is.na(AB_NYC_2019[7]))
+```
+
+```{r check data na 8}
+AB_NYC_2019 %>%
+  verify(!is.na(AB_NYC_2019[8]))
+```
+
+```{r check data na 9}
+AB_NYC_2019 %>%
+  verify(!is.na(AB_NYC_2019[9]))
+```
+
+```{r check data na 10}
+AB_NYC_2019 %>%
+  verify(!is.na(AB_NYC_2019[10]))
+```
+
+```{r check data na 11}
+AB_NYC_2019 %>%
+  verify(!is.na(AB_NYC_2019[11]))
+```
+
+```{r check data na 12}
+AB_NYC_2019 %>%
+  verify(!is.na(AB_NYC_2019[12]))
+```
+
+```{r check data na 13}
+AB_NYC_2019 %>%
+  verify(!is.na(AB_NYC_2019[13]))
+```
+
+```{r check data na 14}
+AB_NYC_2019 %>%
+  verify(!is.na(AB_NYC_2019[14]))
+```
+
+```{r check data na 15}
+AB_NYC_2019 %>%
+  verify(!is.na(AB_NYC_2019[15]))
+```
+
+```{r check data na 16}
+AB_NYC_2019 %>%
+  verify(!is.na(AB_NYC_2019[16]))
+```
+
+
+```{r cheack bounds price}
+AB_NYC_2019%>%
+  assert(within_bounds(0,90000),price)
+```
+  
+```{r cheack bounds minimum nights}
+AB_NYC_2019%>%
+  assert(within_bounds(0,365),minimum_nights)
+```
+
+3. Clean up the data
+# I use clean_names() function to clean the name of columns. I convert the numeric na data to 0. Since the numeric data is last review column, people didn't review thus the "last review" column's na is o. I convert the "neighbourhood_group" column to factors. I transfer the content to lower case in "name" column.  
+# Clean Data 
+```{r clean data clean names}
+AB_NYC_2019%>%
+  clean_names()
+```
+
+```{r clean data make na to 0}
+AB_NYC_2019<-AB_NYC_2019 %>%
+  mutate_if(is.numeric, ~replace(., is.na(.), 0))
+```
+
+```{r clean data convert factors}
+AB_NYC_2019<-AB_NYC_2019%>%
+  mutate(neighbourhood_group=factor(neighbourhood_group))
+```
+
+```{r}
+AB_NYC_2019<-AB_NYC_2019%>%
+  mutate(name=str_to_lower(name))
+```
+
+*Note: Yes, I request the score for all part2 sections replace my score for the coding portion of Assignment 3.* 
 
 4. Using best practices, write four functions which add engineered features to the dataset, including a description and rationale. Include a test to determine whether the features are working as intended. 
+
+#I will predict the price in NYC region. I think the location has the biggest impact on the housing price, so I chose the neigbourhood as the most important feature to analyze this dataset. I labeled the different neighbourhood groups here.
+```{r function 1.1 neighbourhood_factor}
+test_neighbourhood_group<-AB_NYC_2019%>%
+  group_by(neighbourhood_group)%>%
+  summarize(n=n())
+test_neighbourhood_group[[1]]
+```
+Here I test the neighbourhood gourp. We have five big region in NYC. They are Bronx, Brooklyn, Manhattan, Queens and Staten Island. 
+
+```{r fucction 1.2 neighbourhood_factor}
+neighbourhood_factor<- function(data, var){
+  names<-data %>%
+    group_by({{var}})%>%
+    summarise(n=n())
+  data%>%
+    mutate(neighbourhood_factor=case_when({{var}}==names[[1]][1]~1, 
+                                          {{var}}==names[[1]][2]~2,  
+                                          {{var}}==names[[1]][3]~3,  
+                                          {{var}}==names[[1]][4]~4,  
+                                          {{var}}==names[[1]][5]~5))
+}
+
+# test the feature
+neighbourhood_factor(AB_NYC_2019,neighbourhood_group) %>%
+  select(neighbourhood_group, neighbourhood_factor)
+```
+I label Bronx to 1, Brooklyn to 2, Manhattan to 3, Queens to 4 and Staten Island to 5. 
+
+# The name including the luxury might always have a higher price. So I filter the airbnb with word luxury in it. 
+```{r function 2 name_with_luxury}
+name_with_luxury<- function(data, var){
+  data%>%
+    mutate(name_with_luxury = str_count({{var}}, pattern = "luxury"))%>%
+    arrange(desc(name_with_luxury)) 
+}
+
+# test the feature
+name_with_luxury(AB_NYC_2019,name) %>%
+  select(name, name_with_luxury)
+```
+This chunk I count the times of word "luxury" show up in the "name" column. 
+
+# "Last_review" column is the latest review date. The earlier the latest review year date is the fewer the people live in that place. I think the reason people don't choose that place is because it's too expensive or too cheap. So I pick this as one of my features to analyze the price. 
+```{r function 3 last_review_by_year}
+
+last_review_by_year<- function(data, var){
+  data%>%
+    mutate(last_review_by_year = year({{var}}))
+}
+
+# test the feature
+last_review_by_year(AB_NYC_2019, last_review) %>%
+  select(last_review, last_review_by_year)
+```
+In this chunk I simplified the date to year, for example 2018-10-19 will be 2018 in new feature column. 
+
+# The availavility of an airbnb will hit the price for sure. A house which only open few days a year , will not have a good turnover. 
+```{r function 4 availability_per_day}
+availability_per_day<- function(data, var){
+  data%>%
+    mutate(availability_per_day = {{var}}/365)
+}
+
+# test the feature
+availability_per_day(AB_NYC_2019, availability_365) %>%
+  select(availability_365, availability_per_day)
+```
+In this chunk I caluculate the availability per day. 
+
 
 5. Prepare the data for modeling
 
 Note: this will form the basis for your midterm project. Take advantage of TA's and my office hours. We can provide feedback and guidance. 
+
+# I create a new dataframe named "data_prepare" which including the new freatue colunms that I create above and I also borrow some important columns from orignal AB_NYC_2019 dataframe.  
+```{r data prepare}
+data_prepare<-AB_NYC_2019%>%
+  neighbourhood_factor(neighbourhood_group)%>%
+  name_with_luxury(name)%>%
+  last_review_by_year(last_review)%>%
+  availability_per_day(availability_365)%>%
+  select(neighbourhood_factor,name_with_luxury,last_review_by_year,availability_per_day,room_type,minimum_nights,number_of_reviews,reviews_per_month)
+data_prepare
+```
 
